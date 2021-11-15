@@ -1,0 +1,41 @@
+#!/bin/bash
+
+SCREEN="$(xrandr --listactivemonitors | awk -F ' ' 'END {print $1}' | tr -d \:)"
+MONITOR="$(xrandr --listactivemonitors | awk -F ' ' 'END {print $2}' | tr -d \*+)"
+WALLPAPER="$(xfconf-query -c xfce4-desktop -p /backdrop/screen$SCREEN/monitor$MONITOR/workspace0/last-image)"
+
+echo "Проверка каталога"
+if [ -d $HOME/.local/share/panelblur ];
+then
+echo "Каталог существует."
+else
+mkdir $HOME/.local/share/panelblur
+echo "Каталог panelblur был создан"
+fi
+
+
+cd $HOME/.local/share/panelblur
+xfce4-panel-profiles save current-config.tar.bz2 && bzip2 -dc current-config.tar.bz2 | tar -xv && grep -E "/size uint32" config.txt > panel.txt
+sed 's|.*32 ||' panel.txt 
+
+YSIZEPANEL="$(sed 's|.*32 ||' panel.txt)"
+rm $HOME/.local/share/panelblur/panel.txt
+rm $HOME/.local/share/panelblur/config.txt
+rm $HOME/.local/share/panelblur/current-config.tar.bz2
+rm $HOME/.local/share/panelblur/wallpaperblur
+rm $HOME/.local/share/panelblur/wallpaperblurshadow
+rm $HOME/.local/share/panelblur/wallpaper
+
+read RES_X RES_Y <<<$(xdpyinfo | awk -F'[ x]+' '/dimensions:/{print $3, $4}')
+
+#Create wallpaper
+convert $WALLPAPER -quality 100 -resize $RES_X\x -gravity Center -crop x$RES_Y+0+0 $HOME/.local/share/panelblur/wallpaper
+convert $HOME/.local/share/panelblur/wallpaper -quality 100 -crop x$YSIZEPANEL+0+0 -modulate 100,150,100 -blur 0x70 $HOME/.local/share/panelblur/panelblur0
+convert $HOME/.local/share/panelblur/wallpaper $HOME/.local/share/panelblur/panelblur0 -quality 100 -compose over -composite $HOME/.local/share/panelblur/wallpaperblur
+convert $HOME/.local/share/panelblur/wallpaperblur $HOME/.local/share/panelblur/shadow.png -geometry +0+$YSIZEPANEL -quality 100 -compose over -composite $HOME/.local/share/panelblur/wallpaperblurshadow
+rm $HOME/.local/share/panelblur/wallpaper
+rm $HOME/.local/share/panelblur/panelblur0
+rm $HOME/.local/share/panelblur/wallpaperblur
+
+xfconf-query -c xfce4-desktop -p /backdrop/screen$SCREEN/monitor$MONITOR/workspace0/last-image -s $HOME/.local/share/panelblur/wallpaperblurshadow
+
